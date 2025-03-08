@@ -75,6 +75,7 @@ pub enum SubCommands {
         space: String,
     },
     /// Lists all the Spaces stored.
+    #[command(visible_alias = "ls")]
     ListSpaces,
     /// Removes the Space with the given name.
     Remove {

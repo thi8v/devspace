@@ -10,6 +10,14 @@ use crate::{DsError, Result};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
+pub fn pretty_printer_config() -> PrettyConfig {
+    let mut conf = PrettyConfig::default();
+    conf.struct_names = true;
+    conf.separate_tuple_members = true;
+    conf.enumerate_arrays = true;
+    conf
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DataBase {
     entries: HashMap<String, Space>,
@@ -37,7 +45,7 @@ impl DataBase {
     /// Saves the database into the provided file.
     pub fn save(&self, mut file: File) -> Result {
         // TODO: can we put it in drop? i think no because this function can fail
-        let ron_str = ron::ser::to_string_pretty(self, PrettyConfig::default())?;
+        let ron_str = ron::ser::to_string_pretty(self, pretty_printer_config())?;
 
         let buf = ron_str.as_bytes();
 
@@ -51,14 +59,18 @@ impl DataBase {
         self.entries.insert(key.clone(), space);
     }
 
+    /// Iterator over the Spaces
     pub fn spaces_iter(&self) -> Iter<'_, String, Space> {
         self.entries.iter()
     }
 
+    /// Is any Space contained?
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
+    /// Remove the Space with the name provided as argument, does nothing if it
+    /// doesn't exists.
     pub fn remove(&mut self, key: &str) {
         self.entries.remove(key);
     }
