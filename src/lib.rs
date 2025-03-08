@@ -82,6 +82,13 @@ pub enum SubCommands {
         /// Name of the Space to remove.
         space: String,
     },
+    /// Go to the Space with the given name.
+    ///
+    /// If the Space has already been launched the Space isn't recreated.
+    Go {
+        /// Name of the Space to go to.
+        space: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -193,6 +200,7 @@ pub fn run() -> Result {
         SubCommands::Init { path } => ctx.init_subcmd(path)?,
         SubCommands::ListSpaces => ctx.list_spaces_subcmd(),
         SubCommands::Remove { space } => ctx.remove_subcmd(space)?,
+        SubCommands::Go { space } => todo!("GO SUBCOMAND {space}"),
     }
 
     Ok(())
