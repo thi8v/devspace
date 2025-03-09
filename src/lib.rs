@@ -1,4 +1,7 @@
 // TODO: create a dir cmd in src and create one file for each sub command.
+// TODO: add a thing that checks if a new version is available and a config
+// param to disable it. If a new version is available, print a warn when using
+// the app.
 use std::{
     env::{VarError, var},
     fmt::{Debug, Error as FmtError},
@@ -7,7 +10,7 @@ use std::{
     path::PathBuf,
 };
 
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches, Parser};
 use config::{CmdParsingError, Config, SpaceTreeId};
 use database::{DataBase, Space};
 use ron::de::SpannedError;
@@ -50,9 +53,10 @@ pub enum DsError {
     NothingToList,
     #[error(transparent)]
     FmtError(#[from] FmtError),
+    #[error(transparent)]
+    ClapError(#[from] clap::Error),
 }
 
-// TODO: remake the version arg, print the commit alongside the version.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = LONG_ABOUT)]
 pub struct Cli {
@@ -182,9 +186,6 @@ impl Context {
     pub fn terminate(mut self) -> Result {
         self.terminated = true;
 
-        // TODO: because we write the db and config to the buffer do we need to
-        // call it elsewhere?
-
         // write the db to the buf if we forgot to do se before.
         self.write_db_to_buf()?;
 
@@ -251,8 +252,6 @@ impl Context {
             Space::new(abs, tree.unwrap_or(self.config.default_tree.clone())),
         );
 
-        self.write_db_to_buf()?;
-
         Ok(())
     }
 
@@ -317,8 +316,6 @@ impl Context {
 
         self.db.remove(&space);
 
-        self.write_db_to_buf()?;
-
         Ok(())
     }
 
@@ -381,7 +378,10 @@ impl Drop for Context {
 }
 
 pub fn run() -> Result {
-    let args = Cli::parse();
+    let matches = Cli::command()
+        .version(env!("DEVSPACE_FULL_VERSION"))
+        .get_matches();
+    let args = Cli::from_arg_matches(&matches)?;
 
     let mut ctx = Context::new(args.dir()?)?;
 
