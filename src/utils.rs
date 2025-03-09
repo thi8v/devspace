@@ -30,7 +30,7 @@ where
 }
 
 /// Saves the data passed as argument in the given file.
-pub fn save_ron_file<T>(data: &T, mut file: File) -> Result
+pub fn save_ron_file<T>(data: &T, file: &mut File) -> Result
 where
     T: ?Sized + Serialize,
 {

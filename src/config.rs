@@ -132,7 +132,7 @@ fn cmd_placeholders(cmd: &str, space: &Space) -> Result<String> {
             }
         }
         if let Some(k) = key.take() {
-            if k.len() != 0 {
+            if !k.is_empty() {
                 return Err(CmdParsingError::OpeningBracketNoClosing);
             }
         }
@@ -140,7 +140,7 @@ fn cmd_placeholders(cmd: &str, space: &Space) -> Result<String> {
         Ok(res)
     }
 
-    cmd_placeholders_inner(cmd, space).map_err(|e| DsError::CmdParsingError(e))
+    cmd_placeholders_inner(cmd, space).map_err(DsError::CmdParsingError)
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash)]

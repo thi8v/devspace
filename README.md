@@ -8,6 +8,10 @@ devspace helps you to quickly start all the programs you need to dev, like run
 `tmux` split the window vertically then horizontally, open programs inside your
 panes etc ..
 
+## Installation
+
+TODO
+
 ## Definitions
 
 **Space**: its a directory and more data, stored in the database, usualy the
@@ -129,6 +133,7 @@ Licensed under either of
 at your option.
 
 ## Contribution
+
 Feel free to contribute. For the moment there is no documentation but it will come.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted

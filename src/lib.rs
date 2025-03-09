@@ -12,8 +12,7 @@ use database::{DataBase, Space};
 use ron::de::SpannedError;
 use thiserror::Error;
 use tmux_interface::{
-    AttachSession, Error as TmuxError, HasSession, ListSessions, NewSession, SendKeys, SplitWindow,
-    StdIO, Tmux, TmuxCommands,
+    AttachSession, Error as TmuxError, HasSession, NewSession, StdIO, Tmux, TmuxCommands,
 };
 
 pub mod config;
@@ -124,6 +123,16 @@ impl Context {
         create_dir_all(&dir)?;
         let db_path = Context::db_file_path(dir.clone());
 
+        // TODO: create buffers stored in the context for the db and config
+        // where you write everything like its the file and before the context
+        // is dropped you call "terminate" and everything is written to the
+        // file. In the drop implementation do something if the context wasn't
+        // terminated
+        let db_exists = db_path.exists();
+        if !db_exists {
+            println!("file doesn't exist put the default deserialized in it.");
+        }
+
         let db_file = OpenOptions::new()
             .write(true)
             .read(true)
@@ -193,9 +202,9 @@ impl Context {
             Space::new(abs, tree.unwrap_or(self.config.default_tree.clone())),
         );
 
-        let db_file = File::create(self.db_file())?;
+        let mut db_file = File::create(self.db_file())?;
 
-        utils::save_ron_file(&self.db, db_file)?;
+        utils::save_ron_file(&self.db, &mut db_file)?;
 
         Ok(())
     }
@@ -239,9 +248,9 @@ impl Context {
 
         self.db.remove(&space);
 
-        let db_file = File::create(self.db_file())?;
+        let mut db_file = File::create(self.db_file())?;
 
-        utils::save_ron_file(&self.db, db_file)?;
+        utils::save_ron_file(&self.db, &mut db_file)?;
 
         Ok(())
     }
@@ -277,7 +286,7 @@ impl Context {
 
         let tree = self.config.get_tree(&space.tree)?;
         let session_name = &self.session_name(&space_name);
-        let built_treee = tree.build(&space, session_name)?;
+        let built_treee = tree.build(space, session_name)?;
 
         cmds.push_cmds(built_treee);
 
