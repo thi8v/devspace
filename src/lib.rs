@@ -74,6 +74,10 @@ impl Cli {
     }
 }
 
+// TODO: add a subcommand to change the Spaces settings, like:
+// $ devspace change SPACE_NAME --tree TREE_NAME
+// etc etc..
+// TODO: add a `list-trees` subcommand
 #[derive(Parser, Debug)]
 pub enum SubCommands {
     /// Initializes a new development space.

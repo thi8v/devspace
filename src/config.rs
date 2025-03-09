@@ -106,6 +106,7 @@ fn cmd_placeholders(cmd: &str, space: &Space) -> Result<String> {
 
         let mut key = None;
 
+        // TODO: support double brackets and do nothing just put one of the brackets to still be able to use { and }
         for ch in cmd.chars() {
             match ch {
                 '{' => key = Some(String::new()),
@@ -178,7 +179,9 @@ impl Default for Config {
             default_tree: "jump".into(),
             space_trees: HashMap::from([(
                 "jump".into(),
-                SpaceTree::Cmd("cd {Space.base}".to_string()),
+                SpaceTree::Cmd(
+                    "clear && echo 'Hello, welcome to the default devspace's tree'".to_string(),
+                ),
             )]),
         }
     }
