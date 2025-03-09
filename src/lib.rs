@@ -45,6 +45,8 @@ pub enum DsError {
     SpaceTreeNotFound(SpaceTreeId),
     #[error("failed to parse command, {0}")]
     CmdParsingError(CmdParsingError),
+    #[error("no space to list.")]
+    NoSpaceToList,
 }
 
 #[derive(Parser, Debug)]
@@ -106,6 +108,8 @@ pub enum SubCommands {
         space: String,
     },
     /// Lists all the Spaces stored.
+    ///
+    /// Returns a non-zero exit code if there is no spaces stored.
     #[command(visible_alias = "ls")]
     ListSpaces,
     /// Removes the Space with the given name.
@@ -237,10 +241,9 @@ impl Context {
         Ok(())
     }
 
-    pub(crate) fn list_spaces_subcmd(&self) {
+    pub(crate) fn list_spaces_subcmd(&self) -> Result {
         if self.db.is_empty() {
-            // TODO: return an error if there is no Spaces?
-            return;
+            return Err(DsError::NoSpaceToList);
         }
 
         let mut spaces = self.db.spaces_iter().collect::<Vec<_>>();
@@ -267,6 +270,7 @@ impl Context {
                 space.tree.0
             );
         }
+        Ok(())
     }
 
     pub(crate) fn remove_subcmd(&mut self, space: String) -> Result {
@@ -339,7 +343,7 @@ pub fn run() -> Result {
     match args.subcmds {
         SubCommands::Base { space } => ctx.base_subcmd(space)?,
         SubCommands::Init { path, tree } => ctx.init_subcmd(path, tree)?,
-        SubCommands::ListSpaces => ctx.list_spaces_subcmd(),
+        SubCommands::ListSpaces => ctx.list_spaces_subcmd()?,
         SubCommands::Remove { space } => ctx.remove_subcmd(space)?,
         SubCommands::Go { space } => ctx.go_subcmd(space)?,
     }
