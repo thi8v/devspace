@@ -106,6 +106,20 @@ TmuxDefault
 ```
 
 
+### Example
+
+Here is a (working lmao) example of a tree,
+
+```ron
+TmuxVSplit(
+    lhs: Cmd("clear && hx "),
+    rhs: TmuxHSplit(
+        top: TmuxDefault,
+        bottom: TmuxDefault,
+    )
+)
+```
+
 ## License
 
 Licensed under either of
