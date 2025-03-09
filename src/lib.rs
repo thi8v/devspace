@@ -2,7 +2,8 @@ use std::{
     borrow::Cow,
     env::{VarError, var},
     fmt::Debug,
-    fs::{File, OpenOptions, canonicalize, create_dir_all},
+    fs::{File, canonicalize, create_dir_all, read_to_string},
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -62,6 +63,12 @@ pub struct Cli {
 impl Cli {
     /// Gets the directory where to put the devspace stuff.
     pub fn dir(&self) -> Cow<'_, Path> {
+        // TODO: query for the `DEVSPACE_DIR` variable, it could contain the directory.
+        // The order that will be checked for dir:
+        // 1. the `--dir` argument
+        // 2. the `DEVSPACE_DIR` variable
+        // 3. the default `$HOME/.devspace/`
+
         match &self.dir {
             Some(d) => Cow::Borrowed(d),
             None => {
@@ -116,60 +123,83 @@ pub struct Context {
     dir: PathBuf,
     db: DataBase,
     config: Config,
+    /// Did we write back our buffered files?
+    terminated: bool,
+    /// The DataBase file buffer
+    db_buf: String,
+    /// The Config file buffer
+    conf_buf: String,
 }
 
 impl Context {
     pub fn new(dir: PathBuf) -> Result<Context> {
         create_dir_all(&dir)?;
         let db_path = Context::db_file_path(dir.clone());
+        let db_buf;
 
-        // TODO: create buffers stored in the context for the db and config
-        // where you write everything like its the file and before the context
-        // is dropped you call "terminate" and everything is written to the
-        // file. In the drop implementation do something if the context wasn't
-        // terminated
-        let db_exists = db_path.exists();
-        if !db_exists {
-            println!("file doesn't exist put the default deserialized in it.");
+        if db_path.exists() {
+            // file exists, read it and put it in buf
+            db_buf = read_to_string(Context::db_file_path(dir.clone()))?;
+        } else {
+            // file doesn't exist put the default in the buffer
+            db_buf =
+                ron::ser::to_string_pretty(&DataBase::default(), utils::pretty_printer_config())?;
         }
 
-        let db_file = OpenOptions::new()
-            .write(true)
-            .read(true)
-            .create(true) // TODO: instead of use this create fn, make a custom
-            // one where it puts a basic database containing DataBase::default() serialized
-            .truncate(false)
-            .open(db_path)?;
-
         let conf_path = Context::conf_file_path(dir.clone());
+        let conf_buf;
 
-        let conf_file = OpenOptions::new()
-            .write(true)
-            .read(true)
-            .create(true) // TODO: instead of use this create fn, make a custom
-            // one where it puts a basic database containing DataBase::default() serialized
-            .truncate(false)
-            .open(conf_path)?;
+        if conf_path.exists() {
+            // file exists, read it and put it in buf
+            conf_buf = read_to_string(Context::conf_file_path(dir.clone()))?;
+        } else {
+            // file doesn't exist put the default in the buffer
+            conf_buf =
+                ron::ser::to_string_pretty(&Config::default(), utils::pretty_printer_config())?;
+        }
 
         Ok(Context {
             dir,
-            db: utils::from_ron_file(db_file)?,
-            config: utils::from_ron_file(conf_file)?,
+            db: ron::from_str(&db_buf)?,
+            config: ron::from_str(&conf_buf)?,
+            terminated: false,
+            db_buf,
+            conf_buf,
         })
     }
 
-    pub fn db_file_path(mut db_path: PathBuf) -> PathBuf {
-        db_path.push("db.ron");
-        db_path
+    pub fn terminate(mut self) -> Result {
+        self.terminated = true;
+
+        // write back the database to file
+        let mut db_file = File::create(Context::db_file_path(self.dir.clone()))?;
+        db_file.write_all(&self.db_buf.into_bytes())?;
+
+        // write back the config to file
+        let mut conf_file = File::create(Context::conf_file_path(self.dir.clone()))?;
+        conf_file.write_all(&self.conf_buf.into_bytes())?;
+
+        Ok(())
     }
 
-    pub fn conf_file_path(mut conf_path: PathBuf) -> PathBuf {
-        conf_path.push("config.ron");
-        conf_path
+    pub(crate) fn write_db_to_buf(&mut self) -> Result {
+        self.db_buf = ron::ser::to_string_pretty(&self.db, utils::pretty_printer_config())?;
+        Ok(())
     }
 
-    pub fn db_file(&self) -> PathBuf {
-        Context::db_file_path(self.dir.clone())
+    pub(crate) fn write_conf_to_buf(&mut self) -> Result {
+        self.conf_buf = ron::ser::to_string_pretty(&self.config, utils::pretty_printer_config())?;
+        Ok(())
+    }
+
+    pub(crate) fn db_file_path(mut dir: PathBuf) -> PathBuf {
+        dir.push("db.ron");
+        dir
+    }
+
+    pub(crate) fn conf_file_path(mut dir: PathBuf) -> PathBuf {
+        dir.push("config.ron");
+        dir
     }
 
     pub(crate) fn base_subcmd(&self, space_name: String) -> Result {
@@ -202,9 +232,7 @@ impl Context {
             Space::new(abs, tree.unwrap_or(self.config.default_tree.clone())),
         );
 
-        let mut db_file = File::create(self.db_file())?;
-
-        utils::save_ron_file(&self.db, &mut db_file)?;
+        self.write_db_to_buf()?;
 
         Ok(())
     }
@@ -229,7 +257,7 @@ impl Context {
 
         println!(
             "{:^name_width$}| {:^path_width$} | {:^tree_width$}",
-            "NAME", "PATH", "treeE"
+            "NAME", "PATH", "TREE"
         );
         for (name, space) in spaces {
             println!(
@@ -248,9 +276,7 @@ impl Context {
 
         self.db.remove(&space);
 
-        let mut db_file = File::create(self.db_file())?;
-
-        utils::save_ron_file(&self.db, &mut db_file)?;
+        self.write_db_to_buf()?;
 
         Ok(())
     }
@@ -265,7 +291,6 @@ impl Context {
 
         // the session already exists, don't create another one just attach to it.
         if session_exists {
-            // println!("Attached to existing one.");
             let _ = Tmux::with_command(AttachSession::new().target_session(&session_name))
                 .stdin(Some(StdIO::Inherit))
                 .stdout(Some(StdIO::Inherit))
@@ -274,7 +299,6 @@ impl Context {
 
             return Ok(());
         }
-        // println!("New session, didn't existed before");
 
         let mut cmds = TmuxCommands::new().add_command(
             NewSession::new()
@@ -319,6 +343,8 @@ pub fn run() -> Result {
         SubCommands::Remove { space } => ctx.remove_subcmd(space)?,
         SubCommands::Go { space } => ctx.go_subcmd(space)?,
     }
+
+    ctx.terminate()?;
 
     Ok(())
 }
