@@ -6,6 +6,8 @@ use tmux_interface::{SendKeys, SplitWindow, TmuxCommands};
 
 use crate::{DsError, Result, database::Space};
 
+// TODO: add support for other things than Tmux, create a `Tmux(Tree)` Tree
+// that is necessary to use `Tmux*` trees.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum SpaceTree {
     /// A command to run, the format is special.
@@ -28,6 +30,7 @@ pub enum SpaceTree {
         top: Box<SpaceTree>,
         bottom: Box<SpaceTree>,
     },
+    // TODO: rename this name sucks.
     /// The default thing that is runned in a Tmux Pane.
     TmuxDefault,
 }
@@ -52,6 +55,7 @@ impl SpaceTree {
                     );
                 Ok(cmds)
             }
+            // TODO: fix the splits it doesn't work like it should be working.
             Self::TmuxVSplit { lhs, rhs } => {
                 let mut cmds = TmuxCommands::new();
 
@@ -164,7 +168,8 @@ impl From<&str> for SpaceTreeId {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     pub default_tree: SpaceTreeId,
-    space_trees: HashMap<SpaceTreeId, SpaceTree>,
+    // TODO: rename this field to trees.
+    pub(crate) space_trees: HashMap<SpaceTreeId, SpaceTree>,
 }
 
 impl Config {

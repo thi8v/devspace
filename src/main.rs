@@ -5,7 +5,7 @@ use devspace::DsError;
 fn main() -> ExitCode {
     match devspace::run() {
         Ok(()) => ExitCode::SUCCESS,
-        Err(DsError::NoSpaceToList) => ExitCode::FAILURE,
+        Err(DsError::NothingToList) => ExitCode::FAILURE,
         Err(err) => {
             eprintln!("ERROR: {err}");
             ExitCode::FAILURE

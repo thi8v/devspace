@@ -1,6 +1,7 @@
+// TODO: create a dir cmd in src and create one file for each sub command.
 use std::{
     env::{VarError, var},
-    fmt::Debug,
+    fmt::{Debug, Error as FmtError},
     fs::{File, canonicalize, create_dir_all, read_to_string},
     io::Write,
     path::PathBuf,
@@ -45,8 +46,10 @@ pub enum DsError {
     SpaceTreeNotFound(SpaceTreeId),
     #[error("failed to parse command, {0}")]
     CmdParsingError(CmdParsingError),
-    #[error("no space to list.")]
-    NoSpaceToList,
+    #[error("no space or tree to list.")]
+    NothingToList,
+    #[error(transparent)]
+    FmtError(#[from] FmtError),
 }
 
 // TODO: remake the version arg, print the commit alongside the version.
@@ -90,7 +93,7 @@ impl Cli {
 // TODO: add a subcommand to change the Spaces settings, like:
 // $ devspace change SPACE_NAME --tree TREE_NAME
 // etc etc..
-// TODO: add a `list-trees` subcommand
+// TODO: add an interactive comand to create trees.
 #[derive(Parser, Debug)]
 pub enum SubCommands {
     /// Initializes a new development space.
@@ -113,6 +116,11 @@ pub enum SubCommands {
     /// Returns a non-zero exit code if there is no spaces stored.
     #[command(visible_alias = "ls")]
     ListSpaces,
+    /// Lists all the Trees configured.
+    ///
+    /// Returns a non-zero exit code if there is no spaces stored.
+    #[command(visible_alias = "lt")]
+    ListTrees,
     /// Removes the Space with the given name.
     Remove {
         /// Name of the Space to remove.
@@ -174,13 +182,25 @@ impl Context {
     pub fn terminate(mut self) -> Result {
         self.terminated = true;
 
+        // TODO: because we write the db and config to the buffer do we need to
+        // call it elsewhere?
+
+        // write the db to the buf if we forgot to do se before.
+        self.write_db_to_buf()?;
+
         // write back the database to file
         let mut db_file = File::create(Context::db_file_path(&self.dir))?;
-        db_file.write_all(&self.db_buf.into_bytes())?;
+
+        // here we are forced to clone because we later borrow self
+        db_file.write_all(&self.db_buf.clone().into_bytes())?;
+
+        // write the conf to the buf if we forgot to do se before.
+        self.write_conf_to_buf()?;
 
         // write back the config to file
         let mut conf_file = File::create(Context::conf_file_path(&self.dir))?;
-        conf_file.write_all(&self.conf_buf.into_bytes())?;
+        // cannot move things because we implement Drop to check if we terminated.
+        conf_file.write_all(&self.conf_buf.clone().into_bytes())?;
 
         Ok(())
     }
@@ -190,8 +210,6 @@ impl Context {
         Ok(())
     }
 
-    // TODO: Remove later if not used.
-    #[allow(dead_code)]
     pub(crate) fn write_conf_to_buf(&mut self) -> Result {
         self.conf_buf = ron::ser::to_string_pretty(&self.config, utils::pretty_printer_config())?;
         Ok(())
@@ -240,7 +258,7 @@ impl Context {
 
     pub(crate) fn list_spaces_subcmd(&self) -> Result {
         if self.db.is_empty() {
-            return Err(DsError::NoSpaceToList);
+            return Err(DsError::NothingToList);
         }
 
         let mut spaces = self.db.spaces_iter().collect::<Vec<_>>();
@@ -266,6 +284,28 @@ impl Context {
                 space.base.to_string_lossy(),
                 space.tree.0
             );
+        }
+        Ok(())
+    }
+
+    pub(crate) fn list_trees_subcmd(&self) -> Result {
+        if self.config.space_trees.is_empty() {
+            return Err(DsError::NothingToList);
+        }
+
+        let trees = self.config.space_trees.clone();
+        for (name, tree) in trees {
+            println!("{} Tree:", name.0);
+            // TODO: Create a pretty printer for the Tree.
+            // like
+            //
+            // TmuxVSplit:
+            //   | lhs: Cmd(hx)
+            //   | rhs: TmuxHSplit:
+            //      |  top  : TMuxDefault
+            //      | bottom: TMuxDefault
+            println!("  {:?}", tree);
+            println!();
         }
         Ok(())
     }
@@ -332,6 +372,14 @@ impl Context {
     }
 }
 
+impl Drop for Context {
+    fn drop(&mut self) {
+        if !self.terminated {
+            eprintln!("ERROR: You didn't terminate the context!")
+        }
+    }
+}
+
 pub fn run() -> Result {
     let args = Cli::parse();
 
@@ -341,6 +389,7 @@ pub fn run() -> Result {
         SubCommands::Base { space } => ctx.base_subcmd(space)?,
         SubCommands::Init { path, tree } => ctx.init_subcmd(path, tree)?,
         SubCommands::ListSpaces => ctx.list_spaces_subcmd()?,
+        SubCommands::ListTrees => ctx.list_trees_subcmd()?,
         SubCommands::Remove { space } => ctx.remove_subcmd(space)?,
         SubCommands::Go { space } => ctx.go_subcmd(space)?,
     }
