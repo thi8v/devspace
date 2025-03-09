@@ -49,6 +49,7 @@ pub enum DsError {
     NoSpaceToList,
 }
 
+// TODO: remake the version arg, print the commit alongside the version.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = LONG_ABOUT)]
 pub struct Cli {
@@ -142,19 +143,19 @@ pub struct Context {
 impl Context {
     pub fn new(dir: PathBuf) -> Result<Context> {
         create_dir_all(&dir)?;
-        let db_path = Context::db_file_path(dir.clone());
+        let db_path = Context::db_file_path(&dir);
         let db_buf = if db_path.exists() {
             // file exists, read it and put it in buf
-            read_to_string(Context::db_file_path(dir.clone()))?
+            read_to_string(Context::db_file_path(&dir))?
         } else {
             // file doesn't exist put the default in the buffer
             ron::ser::to_string_pretty(&DataBase::default(), utils::pretty_printer_config())?
         };
 
-        let conf_path = Context::conf_file_path(dir.clone());
+        let conf_path = Context::conf_file_path(&dir);
         let conf_buf = if conf_path.exists() {
             // file exists, read it and put it in buf
-            read_to_string(Context::conf_file_path(dir.clone()))?
+            read_to_string(Context::conf_file_path(&dir))?
         } else {
             // file doesn't exist put the default in the buffer
             ron::ser::to_string_pretty(&Config::default(), utils::pretty_printer_config())?
@@ -174,11 +175,11 @@ impl Context {
         self.terminated = true;
 
         // write back the database to file
-        let mut db_file = File::create(Context::db_file_path(self.dir.clone()))?;
+        let mut db_file = File::create(Context::db_file_path(&self.dir))?;
         db_file.write_all(&self.db_buf.into_bytes())?;
 
         // write back the config to file
-        let mut conf_file = File::create(Context::conf_file_path(self.dir.clone()))?;
+        let mut conf_file = File::create(Context::conf_file_path(&self.dir))?;
         conf_file.write_all(&self.conf_buf.into_bytes())?;
 
         Ok(())
@@ -196,12 +197,14 @@ impl Context {
         Ok(())
     }
 
-    pub(crate) fn db_file_path(mut dir: PathBuf) -> PathBuf {
+    pub(crate) fn db_file_path(dir: impl Into<PathBuf>) -> PathBuf {
+        let mut dir = dir.into();
         dir.push("db.ron");
         dir
     }
 
-    pub(crate) fn conf_file_path(mut dir: PathBuf) -> PathBuf {
+    pub(crate) fn conf_file_path(dir: impl Into<PathBuf>) -> PathBuf {
+        let mut dir = dir.into();
         dir.push("config.ron");
         dir
     }
@@ -209,23 +212,17 @@ impl Context {
     pub(crate) fn base_subcmd(&self, space_name: String) -> Result {
         let space = self.db.get_space(&space_name)?;
 
-        println!(
-            "{}",
-            space
-                .base
-                .clone()
-                .into_os_string()
-                .into_string()
-                .unwrap_or_default()
-        );
+        println!("{}", space.base.to_string_lossy());
         Ok(())
     }
 
     pub(crate) fn init_subcmd(&mut self, path: PathBuf, tree: Option<SpaceTreeId>) -> Result {
         let abs = canonicalize(path)?;
 
-        // TODO: remove the unwrap
-        let dir_name = abs.file_name().unwrap().to_string_lossy();
+        let dir_name = abs
+            .file_name()
+            .expect("the path of the directory can't finish with `..`")
+            .to_string_lossy();
 
         if self.db.get_space(&dir_name).is_ok() {
             return Err(DsError::SpaceAlreadyExists(dir_name.into_owned()));
@@ -266,7 +263,7 @@ impl Context {
             println!(
                 "{:name_width$}| {:path_width$} | {:tree_width$}",
                 name,
-                space.base.to_str().unwrap(),
+                space.base.to_string_lossy(),
                 space.tree.0
             );
         }
@@ -308,7 +305,7 @@ impl Context {
             NewSession::new()
                 .attach()
                 .session_name(&session_name)
-                .start_directory(space.base.to_str().unwrap())
+                .start_directory(space.base.to_string_lossy())
                 .into(),
         );
 

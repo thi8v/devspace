@@ -112,12 +112,14 @@ fn cmd_placeholders(cmd: &str, space: &Space) -> Result<String> {
                 '{' => key = Some(String::new()),
                 '}' => {
                     if let Some(k) = key.take() {
-                        let replacement = match k.as_str() {
-                            "Space.base" => space.base.clone(),
+                        let replacement: String = match k.as_str() {
+                            "Space.base" => {
+                                let s = space.base.clone().to_string_lossy().into_owned();
+                                s
+                            }
                             _ => return Err(CmdParsingError::UnknownPlaceholder(k)),
                         };
-                        let replacement = replacement.to_str().unwrap();
-                        res.push_str(replacement);
+                        res.push_str(&replacement);
                     } else {
                         return Err(CmdParsingError::ClosingBracketNoOpening);
                     }

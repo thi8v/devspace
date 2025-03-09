@@ -7,7 +7,7 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(DsError::NoSpaceToList) => ExitCode::FAILURE,
         Err(err) => {
-            eprintln!("ERR: {err}");
+            eprintln!("ERROR: {err}");
             ExitCode::FAILURE
         }
     }

@@ -23,7 +23,7 @@ impl DataBase {
     /// Inserts a new space with the given name (the key), if a space with the
     /// same name already exists it will be overwritten.
     pub fn insert(&mut self, key: String, space: Space) {
-        self.entries.insert(key.clone(), space);
+        self.entries.insert(key, space);
     }
 
     /// Iterator over the Spaces
