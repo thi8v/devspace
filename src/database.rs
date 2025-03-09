@@ -1,22 +1,11 @@
 use std::{
     collections::{HashMap, hash_map::Iter},
-    fs::File,
-    io::{Read, Write},
     path::PathBuf,
 };
 
-use crate::{DsError, Result};
+use crate::{DsError, Result, config::SpaceTreeId};
 
-use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
-
-pub fn pretty_printer_config() -> PrettyConfig {
-    let mut conf = PrettyConfig::default();
-    conf.struct_names = true;
-    conf.separate_tuple_members = true;
-    conf.enumerate_arrays = true;
-    conf
-}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DataBase {
@@ -24,33 +13,11 @@ pub struct DataBase {
 }
 
 impl DataBase {
-    /// Reads a file that contains the database and returns it deserialized.
-    pub fn from_file(mut file: File) -> Result<DataBase> {
-        let mut buf = vec![];
-        file.read_to_end(&mut buf)?;
-        let buf_str = String::from_utf8_lossy(&buf);
-
-        let db = ron::from_str(&buf_str)?;
-        Ok(db)
-    }
-
     /// Retrieve the Space from its name.
     pub fn get_space(&self, space: &str) -> Result<&Space> {
-        Ok(self
-            .entries
+        self.entries
             .get(space)
-            .ok_or_else(|| DsError::SpaceNotFound(space.to_string()))?)
-    }
-
-    /// Saves the database into the provided file.
-    pub fn save(&self, mut file: File) -> Result {
-        // TODO: can we put it in drop? i think no because this function can fail
-        let ron_str = ron::ser::to_string_pretty(self, pretty_printer_config())?;
-
-        let buf = ron_str.as_bytes();
-
-        file.write(buf)?;
-        Ok(())
+            .ok_or_else(|| DsError::SpaceNotFound(space.to_string()))
     }
 
     /// Inserts a new space with the given name (the key), if a space with the
@@ -88,10 +55,13 @@ impl Default for DataBase {
 pub struct Space {
     /// the base directory of
     pub base: PathBuf,
+    /// the tree of Space, how to launch it.
+    #[serde(rename = "tree")]
+    pub tree: SpaceTreeId,
 }
 
 impl Space {
-    pub fn new(base: PathBuf) -> Space {
-        Space { base }
+    pub fn new(base: PathBuf, tree: SpaceTreeId) -> Space {
+        Space { base, tree }
     }
 }

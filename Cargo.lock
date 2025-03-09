@@ -121,6 +121,7 @@ dependencies = [
  "ron",
  "serde",
  "thiserror",
+ "tmux_interface",
 ]
 
 [[package]]
@@ -227,6 +228,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "tmux_interface"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3885889703554d7b0dd515111432fc3b2f9cceb15b2139f9b12da73365299c05"
 
 [[package]]
 name = "unicode-ident"

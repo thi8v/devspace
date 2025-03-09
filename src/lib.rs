@@ -7,11 +7,18 @@ use std::{
 };
 
 use clap::Parser;
+use config::{CmdParsingError, Config, SpaceTreeId};
 use database::{DataBase, Space};
 use ron::de::SpannedError;
 use thiserror::Error;
+use tmux_interface::{
+    AttachSession, Error as TmuxError, HasSession, ListSessions, NewSession, SendKeys, SplitWindow,
+    StdIO, Tmux, TmuxCommands,
+};
 
+pub mod config;
 pub mod database;
+pub mod utils;
 
 const LONG_ABOUT: &str = "\
 Devspace is a tool to save and retrieve your devlopment workspaces.";
@@ -33,6 +40,12 @@ pub enum DsError {
     SpaceNotFound(String),
     #[error("the space {0:?} already exists.")]
     SpaceAlreadyExists(String),
+    #[error("TMUX: {0}")]
+    TmuxError(#[from] TmuxError),
+    #[error("space treee {0:?} not found")]
+    SpaceTreeNotFound(SpaceTreeId),
+    #[error("failed to parse command, {0}")]
+    CmdParsingError(CmdParsingError),
 }
 
 #[derive(Parser, Debug)]
@@ -68,6 +81,10 @@ pub enum SubCommands {
         /// Base path of the new Space.
         #[arg(default_value = ".")]
         path: PathBuf,
+        /// What treee of Space it is, how to launch it.
+        ///
+        /// Defaults to the default set in the config.
+        tree: Option<SpaceTreeId>,
     },
     /// Prints (to stdout) the base directory of a Space.
     Base {
@@ -95,6 +112,7 @@ pub enum SubCommands {
 pub struct Context {
     dir: PathBuf,
     db: DataBase,
+    config: Config,
 }
 
 impl Context {
@@ -107,17 +125,34 @@ impl Context {
             .read(true)
             .create(true) // TODO: instead of use this create fn, make a custom
             // one where it puts a basic database containing DataBase::default() serialized
+            .truncate(false)
             .open(db_path)?;
+
+        let conf_path = Context::conf_file_path(dir.clone());
+
+        let conf_file = OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create(true) // TODO: instead of use this create fn, make a custom
+            // one where it puts a basic database containing DataBase::default() serialized
+            .truncate(false)
+            .open(conf_path)?;
 
         Ok(Context {
             dir,
-            db: DataBase::from_file(db_file)?,
+            db: utils::from_ron_file(db_file)?,
+            config: utils::from_ron_file(conf_file)?,
         })
     }
 
     pub fn db_file_path(mut db_path: PathBuf) -> PathBuf {
         db_path.push("db.ron");
         db_path
+    }
+
+    pub fn conf_file_path(mut conf_path: PathBuf) -> PathBuf {
+        conf_path.push("config.ron");
+        conf_path
     }
 
     pub fn db_file(&self) -> PathBuf {
@@ -139,7 +174,7 @@ impl Context {
         Ok(())
     }
 
-    pub(crate) fn init_subcmd(&mut self, path: PathBuf) -> Result {
+    pub(crate) fn init_subcmd(&mut self, path: PathBuf, tree: Option<SpaceTreeId>) -> Result {
         let abs = canonicalize(path)?;
 
         // TODO: remove the unwrap
@@ -149,11 +184,14 @@ impl Context {
             return Err(DsError::SpaceAlreadyExists(dir_name.into_owned()));
         }
 
-        self.db.insert(dir_name.into_owned(), Space::new(abs));
+        self.db.insert(
+            dir_name.into_owned(),
+            Space::new(abs, tree.unwrap_or(self.config.default_tree.clone())),
+        );
 
         let db_file = File::create(self.db_file())?;
 
-        self.db.save(db_file)?;
+        utils::save_ron_file(&self.db, db_file)?;
 
         Ok(())
     }
@@ -168,10 +206,25 @@ impl Context {
         spaces.sort_by(|a, b| a.0.cmp(b.0));
 
         // can safely unwrap because we know there is at least one value.
-        let width = spaces.iter().map(|(s, _)| s.len()).max().unwrap() + 5;
+        let name_width = spaces.iter().map(|(s, _)| s.len()).max().unwrap().max(8);
+        let path_width = spaces
+            .iter()
+            .map(|(_, s)| s.base.to_str().unwrap().len())
+            .max()
+            .unwrap();
+        let tree_width = spaces.iter().map(|(_, s)| s.tree.0.len()).max().unwrap();
 
+        println!(
+            "{:^name_width$}| {:^path_width$} | {:^tree_width$}",
+            "NAME", "PATH", "treeE"
+        );
         for (name, space) in spaces {
-            println!("{name:width$} {}", space.base.to_str().unwrap());
+            println!(
+                "{:name_width$}| {:path_width$} | {:tree_width$}",
+                name,
+                space.base.to_str().unwrap(),
+                space.tree.0
+            );
         }
     }
 
@@ -184,9 +237,60 @@ impl Context {
 
         let db_file = File::create(self.db_file())?;
 
-        self.db.save(db_file)?;
+        utils::save_ron_file(&self.db, db_file)?;
 
         Ok(())
+    }
+
+    pub(crate) fn go_subcmd(&mut self, space_name: String) -> Result {
+        let session_name = self.session_name(&space_name);
+        let space = self.db.get_space(&space_name)?;
+
+        let session_exists = Tmux::with_command(HasSession::new().target_session(&session_name))
+            .output()?
+            .success();
+
+        // the session already exists, don't create another one just attach to it.
+        if session_exists {
+            // println!("Attached to existing one.");
+            let _ = Tmux::with_command(AttachSession::new().target_session(&session_name))
+                .stdin(Some(StdIO::Inherit))
+                .stdout(Some(StdIO::Inherit))
+                .stderr(Some(StdIO::Inherit))
+                .output()?;
+
+            return Ok(());
+        }
+        // println!("New session, didn't existed before");
+
+        let mut cmds = TmuxCommands::new().add_command(
+            NewSession::new()
+                .attach()
+                .session_name(&session_name)
+                .start_directory(space.base.to_str().unwrap())
+                .into(),
+        );
+
+        let tree = self.config.get_tree(&space.tree)?;
+        let session_name = &self.session_name(&space_name);
+        let built_treee = tree.build(&space, session_name)?;
+
+        cmds.push_cmds(built_treee);
+
+        let _ = Tmux::with_commands(cmds)
+            .stdin(Some(StdIO::Inherit))
+            .stdout(Some(StdIO::Inherit))
+            .stderr(Some(StdIO::Inherit))
+            .output()?;
+
+        Ok(())
+    }
+
+    /// Returns the session name of the given `space`
+    pub fn session_name(&self, space: &str) -> String {
+        let mut sname = String::from("Space_");
+        sname.push_str(space);
+        sname
     }
 }
 
@@ -197,10 +301,10 @@ pub fn run() -> Result {
 
     match args.subcmds {
         SubCommands::Base { space } => ctx.base_subcmd(space)?,
-        SubCommands::Init { path } => ctx.init_subcmd(path)?,
+        SubCommands::Init { path, tree } => ctx.init_subcmd(path, tree)?,
         SubCommands::ListSpaces => ctx.list_spaces_subcmd(),
         SubCommands::Remove { space } => ctx.remove_subcmd(space)?,
-        SubCommands::Go { space } => todo!("GO SUBCOMAND {space}"),
+        SubCommands::Go { space } => ctx.go_subcmd(space)?,
     }
 
     Ok(())
