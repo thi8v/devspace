@@ -1,10 +1,9 @@
 use std::{
-    borrow::Cow,
     env::{VarError, var},
     fmt::Debug,
     fs::{File, canonicalize, create_dir_all, read_to_string},
     io::Write,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use clap::Parser;
@@ -62,21 +61,26 @@ pub struct Cli {
 
 impl Cli {
     /// Gets the directory where to put the devspace stuff.
-    pub fn dir(&self) -> Cow<'_, Path> {
-        // TODO: query for the `DEVSPACE_DIR` variable, it could contain the directory.
+    pub fn dir(&self) -> Result<PathBuf> {
         // The order that will be checked for dir:
         // 1. the `--dir` argument
         // 2. the `DEVSPACE_DIR` variable
         // 3. the default `$HOME/.devspace/`
 
-        match &self.dir {
-            Some(d) => Cow::Borrowed(d),
-            None => {
-                let mut default = PathBuf::from(var("HOME").expect("variable HOME not found wtf"));
-                default.push(concat!(".", env!("CARGO_PKG_NAME"), "/"));
-                Cow::Owned(default)
-            }
+        // first the arg
+        if let Some(d) = &self.dir {
+            return Ok(d.to_path_buf());
         }
+
+        // then the var
+        if let Ok(dir) = var("DEVSPACE_DIR") {
+            return Ok(dir.into());
+        }
+
+        // fallback to the default
+        let mut default = PathBuf::from(var("HOME").expect("variable HOME not found wtf"));
+        default.push(concat!(".", env!("CARGO_PKG_NAME"), "/"));
+        Ok(default)
     }
 }
 
@@ -135,28 +139,22 @@ impl Context {
     pub fn new(dir: PathBuf) -> Result<Context> {
         create_dir_all(&dir)?;
         let db_path = Context::db_file_path(dir.clone());
-        let db_buf;
-
-        if db_path.exists() {
+        let db_buf = if db_path.exists() {
             // file exists, read it and put it in buf
-            db_buf = read_to_string(Context::db_file_path(dir.clone()))?;
+            read_to_string(Context::db_file_path(dir.clone()))?
         } else {
             // file doesn't exist put the default in the buffer
-            db_buf =
-                ron::ser::to_string_pretty(&DataBase::default(), utils::pretty_printer_config())?;
-        }
+            ron::ser::to_string_pretty(&DataBase::default(), utils::pretty_printer_config())?
+        };
 
         let conf_path = Context::conf_file_path(dir.clone());
-        let conf_buf;
-
-        if conf_path.exists() {
+        let conf_buf = if conf_path.exists() {
             // file exists, read it and put it in buf
-            conf_buf = read_to_string(Context::conf_file_path(dir.clone()))?;
+            read_to_string(Context::conf_file_path(dir.clone()))?
         } else {
             // file doesn't exist put the default in the buffer
-            conf_buf =
-                ron::ser::to_string_pretty(&Config::default(), utils::pretty_printer_config())?;
-        }
+            ron::ser::to_string_pretty(&Config::default(), utils::pretty_printer_config())?
+        };
 
         Ok(Context {
             dir,
@@ -187,6 +185,8 @@ impl Context {
         Ok(())
     }
 
+    // TODO: Remove later if not used.
+    #[allow(dead_code)]
     pub(crate) fn write_conf_to_buf(&mut self) -> Result {
         self.conf_buf = ron::ser::to_string_pretty(&self.config, utils::pretty_printer_config())?;
         Ok(())
@@ -334,7 +334,7 @@ impl Context {
 pub fn run() -> Result {
     let args = Cli::parse();
 
-    let mut ctx = Context::new(args.dir().into_owned())?;
+    let mut ctx = Context::new(args.dir()?)?;
 
     match args.subcmds {
         SubCommands::Base { space } => ctx.base_subcmd(space)?,

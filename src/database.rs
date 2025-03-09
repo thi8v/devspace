@@ -7,7 +7,7 @@ use crate::{DsError, Result, config::SpaceTreeId};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct DataBase {
     entries: HashMap<String, Space>,
 }
@@ -43,16 +43,9 @@ impl DataBase {
     }
 }
 
-impl Default for DataBase {
-    fn default() -> Self {
-        DataBase {
-            entries: HashMap::new(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Space {
+    // TODO: rename `base` to something like working directory it's more clear what it is.
     /// the base directory of
     pub base: PathBuf,
     /// the tree of Space, how to launch it.

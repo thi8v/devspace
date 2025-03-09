@@ -12,6 +12,18 @@ panes etc ..
 
 TODO
 
+## Devspace directory
+
+Devspace uses the filesystem to store some stuff and has one directory.
+This directory contains the following:
+- `config.ron`: the configuration of devspace, the Trees and the default Tree
+- `db.ron`: the Space with their base directory and their Tree.
+
+The directory is evaluated based on the following priorities:
+1. the `--dir <path>` argument.
+2. the `DEVSPACE_DIR` global variable.
+3. and fallbacks to the default `$HOME/.devspace/`.
+
 ## Definitions
 
 **Space**: its a directory and more data, stored in the database, usualy the
