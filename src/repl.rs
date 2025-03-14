@@ -48,8 +48,7 @@ pub fn readline(stdout: &mut Stdout, buffer: &mut String) -> Result {
 }
 
 pub fn respond(cli: Command, cmd: &str) -> Result<bool> {
-    // TODO: remove this unwrap
-    let args = shlex::split(cmd).unwrap();
+    let args = shlex::split(cmd).ok_or(DsError::InvalidREPL)?;
     let matches = cli.try_get_matches_from(args)?;
 
     match matches.subcommand() {

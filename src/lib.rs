@@ -57,6 +57,8 @@ pub enum DsError {
     FmtError(#[from] FmtError),
     #[error(transparent)]
     ClapError(#[from] clap::Error),
+    #[error("failed to parse the command in the REPL.")]
+    InvalidREPL,
 }
 
 #[derive(Parser, Debug)]
