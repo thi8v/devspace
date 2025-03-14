@@ -200,7 +200,6 @@ impl From<&str> for SpaceTreeId {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     pub default_tree: SpaceTreeId,
-    // TODO: rename this field to trees.
     pub(crate) trees: HashMap<SpaceTreeId, SpaceTree>,
 }
 
