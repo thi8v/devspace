@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, io::Write};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -91,6 +91,37 @@ impl SpaceTree {
             }
             Self::TmuxDefault => Ok(TmuxCommands::new()),
         }
+    }
+
+    pub const PRINT_INDENT: usize = 2;
+
+    /// Prints the Tree with a Pretty AST like syntax.
+    ///
+    /// Do not flush the Writer, you may need to `flush` it.
+    pub fn pretty_print(&self, w: &mut impl Write, indent: usize) -> Result {
+        match self {
+            Self::TmuxVSplit { lhs, rhs } => {
+                writeln!(w, "TmuxVSplit:")?;
+                write!(w, "{:indent$}  | lhs: ", "")?;
+                lhs.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                write!(w, "{:indent$}  | rhs: ", "")?;
+                rhs.pretty_print(w, indent + Self::PRINT_INDENT)?;
+            }
+            Self::TmuxHSplit { top, bottom } => {
+                writeln!(w, "TmuxHSplit:")?;
+                write!(w, "{:indent$}  | top: ", "")?;
+                top.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                write!(w, "{:indent$}  | bottom: ", "")?;
+                bottom.pretty_print(w, indent + Self::PRINT_INDENT)?;
+            }
+            Self::Cmd(cmd) => {
+                writeln!(w, "Cmd({cmd:?})")?;
+            }
+            Self::TmuxDefault => {
+                writeln!(w, "TmuxDefault")?;
+            }
+        }
+        Ok(())
     }
 }
 

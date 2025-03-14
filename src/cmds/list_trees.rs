@@ -1,25 +1,26 @@
 //! The `list-trees` command.
 
-use crate::{Context, DsError, Result};
+use std::io::Write;
+
+use crate::{Context, DsError, Result, config::SpaceTree};
 
 pub fn command(ctx: &Context) -> Result {
     if ctx.config.trees.is_empty() {
         return Err(DsError::NothingToList);
     }
+    let mut stdout = std::io::stdout();
 
-    let trees = ctx.config.trees.clone();
+    let mut trees = ctx.config.trees.iter().collect::<Vec<_>>();
+    trees.sort_by(|a, b| a.0.0.cmp(&b.0.0));
+
+    writeln!(stdout, "List of trees:")?;
     for (name, tree) in trees {
-        println!("{} Tree:", name.0);
-        // TODO: Create a pretty printer for the Tree.
-        // like
-        //
-        // TmuxVSplit:
-        //   | lhs: Cmd(hx)
-        //   | rhs: TmuxHSplit:
-        //      |  top  : TMuxDefault
-        //      | bottom: TMuxDefault
-        println!("  {:?}", tree);
-        println!();
+        writeln!(stdout)?;
+        write!(stdout, "{:?}:\n  ", name.0)?;
+        tree.pretty_print(&mut stdout, SpaceTree::PRINT_INDENT)?;
     }
+
+    stdout.flush()?;
+
     Ok(())
 }
