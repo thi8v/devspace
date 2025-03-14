@@ -134,20 +134,26 @@ pub enum CmdParsingError {
 fn cmd_placeholders(cmd: &str, space: &Space) -> Result<String> {
     fn cmd_placeholders_inner(cmd: &str, space: &Space) -> Result<String, CmdParsingError> {
         let mut res = String::new();
-
         let mut key = None;
+        let mut chars = cmd.chars().peekable();
 
-        // TODO: support double brackets and do nothing just put one of the brackets to still be able to use { and }
-        for ch in cmd.chars() {
+        while let Some(ch) = chars.next() {
             match ch {
-                '{' => key = Some(String::new()),
+                '{' => {
+                    if chars.peek() == Some(&'{') {
+                        chars.next(); // Consume second '{'
+                        res.push('{');
+                    } else {
+                        key = Some(String::new());
+                    }
+                }
                 '}' => {
-                    if let Some(k) = key.take() {
+                    if chars.peek() == Some(&'}') {
+                        chars.next(); // Consume second '}'
+                        res.push('}');
+                    } else if let Some(k) = key.take() {
                         let replacement: String = match k.as_str() {
-                            "Space.wdir" => {
-                                let s = space.wdir.clone().to_string_lossy().into_owned();
-                                s
-                            }
+                            "Space.wdir" => space.wdir.clone().to_string_lossy().into_owned(),
                             _ => return Err(CmdParsingError::UnknownPlaceholder(k)),
                         };
                         res.push_str(&replacement);
