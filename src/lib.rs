@@ -9,6 +9,7 @@ use std::{
     fmt::{Debug, Error as FmtError},
     fs::{File, create_dir_all, read_to_string},
     io::Write,
+    panic::{self, AssertUnwindSafe},
     path::PathBuf,
 };
 
@@ -186,7 +187,7 @@ impl Context {
         })
     }
 
-    pub fn terminate(mut self) -> Result {
+    pub fn terminate(&mut self) -> Result {
         self.terminated = true;
 
         // write the db to the buf if we forgot to do se before.
@@ -241,8 +242,17 @@ impl Context {
 
 impl Drop for Context {
     fn drop(&mut self) {
+        // if the context isn't terminated, then do it now.
         if !self.terminated {
-            eprintln!("ERROR: You didn't terminate the context!")
+            let res = panic::catch_unwind(AssertUnwindSafe(|| {
+                eprintln!("INFO: Manually terminating the Context in the drop implementation.\n");
+                self.terminate().unwrap();
+            }));
+            if res.is_err() {
+                eprintln!(
+                    "FATAL: The `drop` implementation of Context has panicked but luckily we catched it!"
+                );
+            }
         }
     }
 }
