@@ -1,6 +1,3 @@
-// TODO: when there is more complex commands, add a repl like thing like you
-// run `devspace` then you can run all the commands you want, use the clap thing yeah
-//
 // TODO: add a thing that checks if a new version is available and a config
 // param to disable it. If a new version is available, print a warn when using
 // the app.
@@ -25,6 +22,7 @@ use crate::database::DataBase;
 pub(crate) mod cmds;
 pub mod config;
 pub mod database;
+pub mod repl;
 pub mod utils;
 
 const LONG_ABOUT: &str = "\
@@ -65,7 +63,7 @@ pub enum DsError {
 #[command(version, about, long_about = LONG_ABOUT)]
 pub struct Cli {
     #[command(subcommand)]
-    subcmds: Command,
+    subcmds: Option<Command>,
     /// Overrides the directory where all devspace stuff is stored.
     ///
     /// Defaults to `$HOME/.devspace/`
@@ -257,6 +255,22 @@ impl Drop for Context {
     }
 }
 
+pub fn run_command(args: Cli, ctx: &mut Context, repl: bool) -> Result {
+    match args.subcmds {
+        Some(Command::Init { path, tree }) => init::command(ctx, path, tree)?,
+        Some(Command::Wdir { space }) => wdir::command(ctx, space)?,
+        Some(Command::ListSpaces) => list_spaces::command(ctx)?,
+        Some(Command::ListTrees) => list_trees::command(ctx)?,
+        Some(Command::Remove { space }) => remove::command(ctx, space)?,
+        Some(Command::Go { space }) => go::command(ctx, space)?,
+        None if !repl => {
+            repl::run()?;
+        }
+        None => {}
+    }
+    Ok(())
+}
+
 pub fn run() -> Result {
     let matches = Cli::command()
         .version(env!("DEVSPACE_FULL_VERSION"))
@@ -265,14 +279,7 @@ pub fn run() -> Result {
 
     let mut ctx = Context::new(args.dir()?)?;
 
-    match args.subcmds {
-        Command::Init { path, tree } => init::command(&mut ctx, path, tree)?,
-        Command::Wdir { space } => wdir::command(&ctx, space)?,
-        Command::ListSpaces => list_spaces::command(&ctx)?,
-        Command::ListTrees => list_trees::command(&ctx)?,
-        Command::Remove { space } => remove::command(&mut ctx, space)?,
-        Command::Go { space } => go::command(&mut ctx, space)?,
-    }
+    run_command(args, &mut ctx, false)?;
 
     ctx.terminate()?;
 
