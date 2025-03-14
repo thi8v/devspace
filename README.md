@@ -108,8 +108,8 @@ This tree will make a Vertical split in the Tmux session, with one the left
 
 ```ron
 TmuxVSplit(
- rhs: ANOTHER_TREE,
- lhs: ANOTHER_TREE,
+ rhs: ANOTHER_TREE, // optional
+ lhs: ANOTHER_TREE, // optional
 )
 ```
 
@@ -120,18 +120,9 @@ This tree will make an Horizontal split in the Tmux session, with one the left
 
 ```ron
 TmuxVSplit(
- rhs: ANOTHER_TREE,
- lhs: ANOTHER_TREE,
+ rhs: ANOTHER_TREE, // optional
+ lhs: ANOTHER_TREE, // optional
 )
-```
-
-### TmuxDefault
-
-Does nothing :) used when you don't want to do anything like just split the
-pane and then just the shell provided by default by Tmux.
-
-```ron
-TmuxDefault
 ```
 
 
@@ -142,10 +133,7 @@ Here is a (working lmao) example of a tree,
 ```ron
 TmuxVSplit(
     lhs: Cmd("clear && hx "),
-    rhs: TmuxHSplit(
-        top: TmuxDefault,
-        bottom: TmuxDefault,
-    )
+    rhs: TmuxHSplit(),
 )
 ```
 

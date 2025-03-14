@@ -6,8 +6,6 @@ use tmux_interface::{SendKeys, SplitWindow, TmuxCommands};
 
 use crate::{DsError, Result, database::Space};
 
-// TODO: add support for other things than Tmux, create a `Tmux(Tree)` Tree
-// that is necessary to use `Tmux*` trees. Yeah but what?
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum SpaceTree {
     /// A command to run, the format is special.
@@ -20,20 +18,16 @@ pub enum SpaceTree {
     /// vertically. A Space Tree will be applied to the left and one to the
     /// right.
     TmuxVSplit {
-        lhs: Box<SpaceTree>,
-        rhs: Box<SpaceTree>,
+        lhs: Option<Box<SpaceTree>>,
+        rhs: Option<Box<SpaceTree>>,
     },
     /// Launch tmux if not already in a Tmux session and split the pane in two
     /// horizontally. A Space Tree will be applied to the top and one to the
     /// bottom.
     TmuxHSplit {
-        top: Box<SpaceTree>,
-        bottom: Box<SpaceTree>,
+        top: Option<Box<SpaceTree>>,
+        bottom: Option<Box<SpaceTree>>,
     },
-    // TODO: rename this name sucks or make the `lhs`, `rhs`, `top`, `bottom`
-    // fields Options so no need for this and it avoids allocation.
-    /// The default thing that is runned in a Tmux Pane.
-    TmuxDefault,
 }
 
 impl SpaceTree {
@@ -56,15 +50,19 @@ impl SpaceTree {
                 let mut cmds = TmuxCommands::new();
 
                 // push the lhs first
-                let lhs = lhs.build(space, space_name)?;
-                cmds.push_cmds(lhs);
+                if let Some(lhs) = lhs {
+                    let lhs = lhs.build(space, space_name)?;
+                    cmds.push_cmds(lhs);
+                }
 
                 // push the split
                 cmds.push(SplitWindow::new().horizontal().target_window(space_name));
 
                 // finally push the rhs
-                let rhs = rhs.build(space, space_name)?;
-                cmds.push_cmds(rhs);
+                if let Some(rhs) = rhs {
+                    let rhs = rhs.build(space, space_name)?;
+                    cmds.push_cmds(rhs);
+                }
 
                 Ok(cmds)
             }
@@ -72,19 +70,22 @@ impl SpaceTree {
                 let mut cmds = TmuxCommands::new();
 
                 // push the top first
-                let top = top.build(space, space_name)?;
-                cmds.push_cmds(top);
+                if let Some(top) = top {
+                    let top = top.build(space, space_name)?;
+                    cmds.push_cmds(top);
+                }
 
                 // push the split
                 cmds.push(SplitWindow::new().vertical().target_window(space_name));
 
                 // finally push the bottom
-                let bottom = bottom.build(space, space_name)?;
-                cmds.push_cmds(bottom);
+                if let Some(bottom) = bottom {
+                    let bottom = bottom.build(space, space_name)?;
+                    cmds.push_cmds(bottom);
+                }
 
                 Ok(cmds)
             }
-            Self::TmuxDefault => Ok(TmuxCommands::new()),
         }
     }
 
@@ -97,23 +98,39 @@ impl SpaceTree {
         match self {
             Self::TmuxVSplit { lhs, rhs } => {
                 writeln!(w, "TmuxVSplit:")?;
+
                 write!(w, "{:indent$}  | lhs: ", "")?;
-                lhs.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                if let Some(lhs) = lhs {
+                    lhs.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                } else {
+                    writeln!(w, "None")?;
+                }
+
                 write!(w, "{:indent$}  | rhs: ", "")?;
-                rhs.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                if let Some(rhs) = rhs {
+                    rhs.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                } else {
+                    writeln!(w, "None")?;
+                }
             }
             Self::TmuxHSplit { top, bottom } => {
                 writeln!(w, "TmuxHSplit:")?;
+
                 write!(w, "{:indent$}  | top: ", "")?;
-                top.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                if let Some(top) = top {
+                    top.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                } else {
+                    writeln!(w, "None")?;
+                }
                 write!(w, "{:indent$}  | bottom: ", "")?;
-                bottom.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                if let Some(bottom) = bottom {
+                    bottom.pretty_print(w, indent + Self::PRINT_INDENT)?;
+                } else {
+                    writeln!(w, "None")?;
+                }
             }
             Self::Cmd(cmd) => {
                 writeln!(w, "Cmd({cmd:?})")?;
-            }
-            Self::TmuxDefault => {
-                writeln!(w, "TmuxDefault")?;
             }
         }
         Ok(())
