@@ -1,24 +1,27 @@
-// TODO: create a dir cmd in src and create one file for each sub command.
+// TODO: when there is more complex commands, add a repl like thing like you
+// run `devspace` then you can run all the commands you want, use the clap thing yeah
+//
 // TODO: add a thing that checks if a new version is available and a config
 // param to disable it. If a new version is available, print a warn when using
 // the app.
 use std::{
     env::{VarError, var},
     fmt::{Debug, Error as FmtError},
-    fs::{File, canonicalize, create_dir_all, read_to_string},
+    fs::{File, create_dir_all, read_to_string},
     io::Write,
     path::PathBuf,
 };
 
 use clap::{CommandFactory, FromArgMatches, Parser};
-use config::{CmdParsingError, Config, SpaceTreeId};
-use database::{DataBase, Space};
 use ron::de::SpannedError;
 use thiserror::Error;
-use tmux_interface::{
-    AttachSession, Error as TmuxError, HasSession, NewSession, StdIO, Tmux, TmuxCommands,
-};
+use tmux_interface::Error as TmuxError;
 
+use crate::cmds::*;
+use crate::config::{CmdParsingError, Config, SpaceTreeId};
+use crate::database::DataBase;
+
+pub(crate) mod cmds;
 pub mod config;
 pub mod database;
 pub mod utils;
@@ -228,139 +231,6 @@ impl Context {
         dir
     }
 
-    pub(crate) fn wdir_subcmd(&self, space_name: String) -> Result {
-        let space = self.db.get_space(&space_name)?;
-
-        println!("{}", space.wdir.to_string_lossy());
-        Ok(())
-    }
-
-    pub(crate) fn init_subcmd(&mut self, path: PathBuf, tree: Option<SpaceTreeId>) -> Result {
-        let abs = canonicalize(path)?;
-
-        let dir_name = abs
-            .file_name()
-            .expect("the path of the directory can't finish with `..`")
-            .to_string_lossy();
-
-        if self.db.get_space(&dir_name).is_ok() {
-            return Err(DsError::SpaceAlreadyExists(dir_name.into_owned()));
-        }
-
-        self.db.insert(
-            dir_name.into_owned(),
-            Space::new(abs, tree.unwrap_or(self.config.default_tree.clone())),
-        );
-
-        Ok(())
-    }
-
-    pub(crate) fn list_spaces_subcmd(&self) -> Result {
-        if self.db.is_empty() {
-            return Err(DsError::NothingToList);
-        }
-
-        let mut spaces = self.db.spaces_iter().collect::<Vec<_>>();
-        spaces.sort_by(|a, b| a.0.cmp(b.0));
-
-        // can safely unwrap because we know there is at least one value.
-        let name_width = spaces.iter().map(|(s, _)| s.len()).max().unwrap().max(8);
-        let path_width = spaces
-            .iter()
-            .map(|(_, s)| s.wdir.to_str().unwrap().len())
-            .max()
-            .unwrap();
-        let tree_width = spaces.iter().map(|(_, s)| s.tree.0.len()).max().unwrap();
-
-        println!(
-            "{:^name_width$}| {:^path_width$} | {:^tree_width$}",
-            "NAME", "PATH", "TREE"
-        );
-        for (name, space) in spaces {
-            println!(
-                "{:name_width$}| {:path_width$} | {:tree_width$}",
-                name,
-                space.wdir.to_string_lossy(),
-                space.tree.0
-            );
-        }
-        Ok(())
-    }
-
-    pub(crate) fn list_trees_subcmd(&self) -> Result {
-        if self.config.trees.is_empty() {
-            return Err(DsError::NothingToList);
-        }
-
-        let trees = self.config.trees.clone();
-        for (name, tree) in trees {
-            println!("{} Tree:", name.0);
-            // TODO: Create a pretty printer for the Tree.
-            // like
-            //
-            // TmuxVSplit:
-            //   | lhs: Cmd(hx)
-            //   | rhs: TmuxHSplit:
-            //      |  top  : TMuxDefault
-            //      | bottom: TMuxDefault
-            println!("  {:?}", tree);
-            println!();
-        }
-        Ok(())
-    }
-
-    pub(crate) fn remove_subcmd(&mut self, space: String) -> Result {
-        if self.db.get_space(&space).is_err() {
-            return Err(DsError::SpaceAlreadyExists(space));
-        }
-
-        self.db.remove(&space);
-
-        Ok(())
-    }
-
-    pub(crate) fn go_subcmd(&mut self, space_name: String) -> Result {
-        let session_name = self.session_name(&space_name);
-        let space = self.db.get_space(&space_name)?;
-
-        let session_exists = Tmux::with_command(HasSession::new().target_session(&session_name))
-            .output()?
-            .success();
-
-        // the session already exists, don't create another one just attach to it.
-        if session_exists {
-            let _ = Tmux::with_command(AttachSession::new().target_session(&session_name))
-                .stdin(Some(StdIO::Inherit))
-                .stdout(Some(StdIO::Inherit))
-                .stderr(Some(StdIO::Inherit))
-                .output()?;
-
-            return Ok(());
-        }
-
-        let mut cmds = TmuxCommands::new().add_command(
-            NewSession::new()
-                .attach()
-                .session_name(&session_name)
-                .start_directory(space.wdir.to_string_lossy())
-                .into(),
-        );
-
-        let tree = self.config.get_tree(&space.tree)?;
-        let session_name = &self.session_name(&space_name);
-        let built_treee = tree.build(space, session_name)?;
-
-        cmds.push_cmds(built_treee);
-
-        let _ = Tmux::with_commands(cmds)
-            .stdin(Some(StdIO::Inherit))
-            .stdout(Some(StdIO::Inherit))
-            .stderr(Some(StdIO::Inherit))
-            .output()?;
-
-        Ok(())
-    }
-
     /// Returns the session name of the given `space`
     pub fn session_name(&self, space: &str) -> String {
         let mut sname = String::from("Space_");
@@ -386,12 +256,12 @@ pub fn run() -> Result {
     let mut ctx = Context::new(args.dir()?)?;
 
     match args.subcmds {
-        SubCommands::Wdir { space } => ctx.wdir_subcmd(space)?,
-        SubCommands::Init { path, tree } => ctx.init_subcmd(path, tree)?,
-        SubCommands::ListSpaces => ctx.list_spaces_subcmd()?,
-        SubCommands::ListTrees => ctx.list_trees_subcmd()?,
-        SubCommands::Remove { space } => ctx.remove_subcmd(space)?,
-        SubCommands::Go { space } => ctx.go_subcmd(space)?,
+        SubCommands::Init { path, tree } => init::command(&mut ctx, path, tree)?,
+        SubCommands::Wdir { space } => wdir::command(&ctx, space)?,
+        SubCommands::ListSpaces => list_spaces::command(&ctx)?,
+        SubCommands::ListTrees => list_trees::command(&ctx)?,
+        SubCommands::Remove { space } => remove::command(&mut ctx, space)?,
+        SubCommands::Go { space } => go::command(&mut ctx, space)?,
     }
 
     ctx.terminate()?;

@@ -14,7 +14,7 @@ pub enum SpaceTree {
     ///
     /// When executed `$(..)` will be parsed and its content can only be:
     /// - `Space.wdir` -> will be replaced by the working directory path of the
-    /// Space that is runned.
+    ///   Space that is runned.
     Cmd(String),
     /// Launch tmux if not already in a Tmux session and split the pane in two
     /// vertically. A Space Tree will be applied to the left and one to the
