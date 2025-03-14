@@ -10,7 +10,20 @@ panes etc ..
 
 ## Installation
 
-TODO
+_Devspace isn't yet published to crates.io or any other package, so you need to
+manually install it._
+
+### Prerequisites
+
+Cargo and Rust `1.85.0`.
+
+### Guide
+
+1. Clone the repo, `$ git clone git@github.com:thi8v/devspace.git`
+2. Move into it, `$ cd devspace`
+3. Install it locally through cargo, `$ cargo install --path .`
+4. Use it `$ devspace ...` if it doesn't work make sure the directory where
+   cargo puts the Rust binaries is in your `PATH` environment variable.
 
 ## Devspace directory
 
