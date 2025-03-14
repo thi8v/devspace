@@ -7,7 +7,7 @@ use tmux_interface::{SendKeys, SplitWindow, TmuxCommands};
 use crate::{DsError, Result, database::Space};
 
 // TODO: add support for other things than Tmux, create a `Tmux(Tree)` Tree
-// that is necessary to use `Tmux*` trees.
+// that is necessary to use `Tmux*` trees. Yeah but what?
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum SpaceTree {
     /// A command to run, the format is special.
@@ -44,16 +44,11 @@ impl SpaceTree {
                 let cmds = TmuxCommands::new()
                     .add_command(
                         SendKeys::new()
-                            .target_pane("Space_devspace")
+                            .target_pane(space_name)
                             .key(parsed_cmd)
                             .into(),
                     )
-                    .add_command(
-                        SendKeys::new()
-                            .target_pane("Space_devspace")
-                            .key("C-m")
-                            .into(),
-                    );
+                    .add_command(SendKeys::new().target_pane(space_name).key("C-m").into());
                 Ok(cmds)
             }
             // TODO: fix the splits it doesn't work like it should be working.
