@@ -13,8 +13,8 @@ pub enum SpaceTree {
     /// A command to run, the format is special.
     ///
     /// When executed `$(..)` will be parsed and its content can only be:
-    /// - `Space.base` -> will be replaced by the base directory path of the
-    ///   Space that is runned.
+    /// - `Space.wdir` -> will be replaced by the working directory path of the
+    /// Space that is runned.
     Cmd(String),
     /// Launch tmux if not already in a Tmux session and split the pane in two
     /// vertically. A Space Tree will be applied to the left and one to the
@@ -30,7 +30,8 @@ pub enum SpaceTree {
         top: Box<SpaceTree>,
         bottom: Box<SpaceTree>,
     },
-    // TODO: rename this name sucks.
+    // TODO: rename this name sucks or make the `lhs`, `rhs`, `top`, `bottom`
+    // fields Options so no need for this and it avoids allocation.
     /// The default thing that is runned in a Tmux Pane.
     TmuxDefault,
 }
@@ -117,8 +118,8 @@ fn cmd_placeholders(cmd: &str, space: &Space) -> Result<String> {
                 '}' => {
                     if let Some(k) = key.take() {
                         let replacement: String = match k.as_str() {
-                            "Space.base" => {
-                                let s = space.base.clone().to_string_lossy().into_owned();
+                            "Space.wdir" => {
+                                let s = space.wdir.clone().to_string_lossy().into_owned();
                                 s
                             }
                             _ => return Err(CmdParsingError::UnknownPlaceholder(k)),
@@ -169,12 +170,12 @@ impl From<&str> for SpaceTreeId {
 pub struct Config {
     pub default_tree: SpaceTreeId,
     // TODO: rename this field to trees.
-    pub(crate) space_trees: HashMap<SpaceTreeId, SpaceTree>,
+    pub(crate) trees: HashMap<SpaceTreeId, SpaceTree>,
 }
 
 impl Config {
     pub fn get_tree(&self, key: &SpaceTreeId) -> Result<&SpaceTree> {
-        self.space_trees
+        self.trees
             .get(key)
             .ok_or(DsError::SpaceTreeNotFound(key.clone()))
     }
@@ -184,7 +185,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             default_tree: "jump".into(),
-            space_trees: HashMap::from([(
+            trees: HashMap::from([(
                 "jump".into(),
                 SpaceTree::Cmd(
                     "clear && echo 'Hello, welcome to the default devspace's tree'".to_string(),

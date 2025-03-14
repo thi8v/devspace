@@ -110,8 +110,8 @@ pub enum SubCommands {
         /// Defaults to the default set in the config.
         tree: Option<SpaceTreeId>,
     },
-    /// Prints (to stdout) the base directory of a Space.
-    Base {
+    /// Prints (to stdout) the working directory of a Space.
+    Wdir {
         /// The space you want to goto.
         space: String,
     },
@@ -228,10 +228,10 @@ impl Context {
         dir
     }
 
-    pub(crate) fn base_subcmd(&self, space_name: String) -> Result {
+    pub(crate) fn wdir_subcmd(&self, space_name: String) -> Result {
         let space = self.db.get_space(&space_name)?;
 
-        println!("{}", space.base.to_string_lossy());
+        println!("{}", space.wdir.to_string_lossy());
         Ok(())
     }
 
@@ -267,7 +267,7 @@ impl Context {
         let name_width = spaces.iter().map(|(s, _)| s.len()).max().unwrap().max(8);
         let path_width = spaces
             .iter()
-            .map(|(_, s)| s.base.to_str().unwrap().len())
+            .map(|(_, s)| s.wdir.to_str().unwrap().len())
             .max()
             .unwrap();
         let tree_width = spaces.iter().map(|(_, s)| s.tree.0.len()).max().unwrap();
@@ -280,7 +280,7 @@ impl Context {
             println!(
                 "{:name_width$}| {:path_width$} | {:tree_width$}",
                 name,
-                space.base.to_string_lossy(),
+                space.wdir.to_string_lossy(),
                 space.tree.0
             );
         }
@@ -288,11 +288,11 @@ impl Context {
     }
 
     pub(crate) fn list_trees_subcmd(&self) -> Result {
-        if self.config.space_trees.is_empty() {
+        if self.config.trees.is_empty() {
             return Err(DsError::NothingToList);
         }
 
-        let trees = self.config.space_trees.clone();
+        let trees = self.config.trees.clone();
         for (name, tree) in trees {
             println!("{} Tree:", name.0);
             // TODO: Create a pretty printer for the Tree.
@@ -342,7 +342,7 @@ impl Context {
             NewSession::new()
                 .attach()
                 .session_name(&session_name)
-                .start_directory(space.base.to_string_lossy())
+                .start_directory(space.wdir.to_string_lossy())
                 .into(),
         );
 
@@ -386,7 +386,7 @@ pub fn run() -> Result {
     let mut ctx = Context::new(args.dir()?)?;
 
     match args.subcmds {
-        SubCommands::Base { space } => ctx.base_subcmd(space)?,
+        SubCommands::Wdir { space } => ctx.wdir_subcmd(space)?,
         SubCommands::Init { path, tree } => ctx.init_subcmd(path, tree)?,
         SubCommands::ListSpaces => ctx.list_spaces_subcmd()?,
         SubCommands::ListTrees => ctx.list_trees_subcmd()?,

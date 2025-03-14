@@ -17,7 +17,7 @@ TODO
 Devspace uses the filesystem to store some stuff and has one directory.
 This directory contains the following:
 - `config.ron`: the configuration of devspace, the Trees and the default Tree
-- `db.ron`: the Space with their base directory and their Tree.
+- `db.ron`: the Space with their working directory and their Tree.
 
 The directory is evaluated based on the following priorities:
 1. the `--dir <path>` argument.
@@ -81,8 +81,8 @@ placeholders, in the Command String you can put `{ .. }` and between the
 brackets you can put variable names that will be replaced when launched.
 
 Support variable names in placeholders:
-`Space.base` : replaced with the Space's base directory path when launched
-_That's it actually lmao_
+`Space.wdir` : replaced with the Space's working directory path when launched
+ _That's it actually lmao_
 
 ```ron
 Cmd(COMMAND_STRING)

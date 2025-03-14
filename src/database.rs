@@ -45,16 +45,15 @@ impl DataBase {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Space {
-    // TODO: rename `base` to something like working directory it's more clear what it is.
-    /// the base directory of
-    pub base: PathBuf,
+    /// the working directory of the space
+    pub wdir: PathBuf,
     /// the tree of Space, how to launch it.
     #[serde(rename = "tree")]
     pub tree: SpaceTreeId,
 }
 
 impl Space {
-    pub fn new(base: PathBuf, tree: SpaceTreeId) -> Space {
-        Space { base, tree }
+    pub fn new(wdir: PathBuf, tree: SpaceTreeId) -> Space {
+        Space { wdir, tree }
     }
 }
