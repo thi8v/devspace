@@ -65,7 +65,7 @@ pub enum DsError {
 #[command(version, about, long_about = LONG_ABOUT)]
 pub struct Cli {
     #[command(subcommand)]
-    subcmds: SubCommands,
+    subcmds: Command,
     /// Overrides the directory where all devspace stuff is stored.
     ///
     /// Defaults to `$HOME/.devspace/`
@@ -103,7 +103,7 @@ impl Cli {
 // etc etc..
 // TODO: add an interactive comand to create trees.
 #[derive(Parser, Debug)]
-pub enum SubCommands {
+pub enum Command {
     /// Initializes a new development space.
     Init {
         /// Base path of the new Space.
@@ -266,12 +266,12 @@ pub fn run() -> Result {
     let mut ctx = Context::new(args.dir()?)?;
 
     match args.subcmds {
-        SubCommands::Init { path, tree } => init::command(&mut ctx, path, tree)?,
-        SubCommands::Wdir { space } => wdir::command(&ctx, space)?,
-        SubCommands::ListSpaces => list_spaces::command(&ctx)?,
-        SubCommands::ListTrees => list_trees::command(&ctx)?,
-        SubCommands::Remove { space } => remove::command(&mut ctx, space)?,
-        SubCommands::Go { space } => go::command(&mut ctx, space)?,
+        Command::Init { path, tree } => init::command(&mut ctx, path, tree)?,
+        Command::Wdir { space } => wdir::command(&ctx, space)?,
+        Command::ListSpaces => list_spaces::command(&ctx)?,
+        Command::ListTrees => list_trees::command(&ctx)?,
+        Command::Remove { space } => remove::command(&mut ctx, space)?,
+        Command::Go { space } => go::command(&mut ctx, space)?,
     }
 
     ctx.terminate()?;
