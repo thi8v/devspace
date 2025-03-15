@@ -1,3 +1,4 @@
+// TODO: replace this with shadow-rs with CLAP_LONG_VERSION
 use std::process::Command;
 
 fn main() {

@@ -1,3 +1,10 @@
+// TODO: make groups of command, like Spaces related commands, Trees related
+// commands etc
+//
+// TODO: save the last used Space and put it in some file like the config so
+// you aren't forced to put the name of the Space everywhere if there is
+// already one stored.
+//
 // TODO: add a thing that checks if a new version is available and a config
 // param to disable it. If a new version is available, print a warn when using
 // the app.
@@ -47,7 +54,7 @@ pub enum DsError {
     SpaceAlreadyExists(String),
     #[error("TMUX: {0}")]
     TmuxError(#[from] TmuxError),
-    #[error("space treee {0:?} not found")]
+    #[error("space treee {:?} not found", .0.0)]
     SpaceTreeNotFound(SpaceTreeId),
     #[error("failed to parse command, {0}")]
     CmdParsingError(CmdParsingError),
@@ -59,6 +66,8 @@ pub enum DsError {
     ClapError(#[from] clap::Error),
     #[error("failed to parse the command in the REPL.")]
     InvalidREPL,
+    #[error("the directory {0:?} doesn't exists.")]
+    DirDoesntExists(PathBuf),
 }
 
 #[derive(Parser, Debug)]
@@ -98,9 +107,6 @@ impl Cli {
     }
 }
 
-// TODO: add a subcommand to change the Spaces settings, like:
-// $ devspace change SPACE_NAME --tree TREE_NAME
-// etc etc..
 // TODO: add an interactive comand to create trees.
 #[derive(Parser, Debug)]
 pub enum Command {
@@ -140,6 +146,17 @@ pub enum Command {
     Go {
         /// Name of the Space to go to.
         space: String,
+    },
+    /// Edit a space config.
+    Edit {
+        /// Name of the Space to go to.
+        space: String,
+        /// The new working directory of the Space.
+        #[arg(long, short)]
+        wdir: Option<PathBuf>,
+        /// The new tree of the Space.
+        #[arg(long, short)]
+        tree: Option<SpaceTreeId>,
     },
 }
 
@@ -245,7 +262,8 @@ impl Drop for Context {
         // if the context isn't terminated, then do it now.
         if !self.terminated {
             let res = panic::catch_unwind(AssertUnwindSafe(|| {
-                eprintln!("INFO: Manually terminating the Context in the drop implementation.\n");
+                #[cfg(debug_assertions)]
+                eprintln!("INFO: Manually terminating the Context in the drop implementation.");
                 self.terminate().unwrap();
             }));
             if res.is_err() {
@@ -265,6 +283,7 @@ pub fn run_command(args: Cli, ctx: &mut Context, repl: bool) -> Result {
         Some(Command::ListTrees) => list_trees::command(ctx)?,
         Some(Command::Remove { space }) => remove::command(ctx, space)?,
         Some(Command::Go { space }) => go::command(ctx, space)?,
+        Some(Command::Edit { space, wdir, tree }) => edit::command(ctx, space, wdir, tree)?,
         None if !repl => {
             repl::run()?;
         }

@@ -20,6 +20,13 @@ impl DataBase {
             .ok_or_else(|| DsError::SpaceNotFound(space.to_string()))
     }
 
+    /// Retrieve the Space from its name.
+    pub fn get_space_mut(&mut self, space: &str) -> Result<&mut Space> {
+        self.entries
+            .get_mut(space)
+            .ok_or_else(|| DsError::SpaceNotFound(space.to_string()))
+    }
+
     /// Inserts a new space with the given name (the key), if a space with the
     /// same name already exists it will be overwritten.
     pub fn insert(&mut self, key: String, space: Space) {
