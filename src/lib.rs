@@ -19,6 +19,7 @@ use std::{
 
 use clap::{CommandFactory, FromArgMatches, Parser};
 use ron::de::SpannedError;
+use shadow_rs::shadow;
 use thiserror::Error;
 use tmux_interface::Error as TmuxError;
 
@@ -26,6 +27,7 @@ use crate::cmds::*;
 use crate::config::{CmdParsingError, Config, SpaceTreeId};
 use crate::database::DataBase;
 
+shadow!(build);
 pub(crate) mod cmds;
 pub mod config;
 pub mod database;
@@ -294,7 +296,7 @@ pub fn run_command(args: Cli, ctx: &mut Context, repl: bool) -> Result {
 
 pub fn run() -> Result {
     let matches = Cli::command()
-        .version(env!("DEVSPACE_FULL_VERSION"))
+        .version(build::CLAP_LONG_VERSION)
         .get_matches();
     let args = Cli::from_arg_matches(&matches)?;
 
