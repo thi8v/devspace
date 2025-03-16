@@ -1,3 +1,6 @@
+// TODO: be able to create Spaces with a name different than the directory it
+// is in.
+//
 // TODO: make groups of command, like Spaces related commands, Trees related
 // commands etc
 //
@@ -46,8 +49,8 @@ pub enum DsError {
     VarError(#[from] VarError),
     #[error("IO: {0}")]
     IoError(#[from] std::io::Error),
-    #[error("failed to parse a database, {0}.")]
-    DbParsingError(#[from] SpannedError),
+    #[error("failed to parse a file, {0}.")]
+    FileParsingError(#[from] SpannedError),
     #[error("failed to save the database: {0}")]
     DbSavingError(#[from] ron::Error),
     #[error("the space {0:?} was not found.")]
