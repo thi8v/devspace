@@ -14,6 +14,8 @@
 //
 // TODO: create a `remove-tree` command, and rename `remove` command to
 // `remove-space`
+//
+// TODO: make the shell completions with `clap_complete`
 use std::{
     env::{VarError, var},
     fmt::{Debug, Error as FmtError},
@@ -146,7 +148,8 @@ pub enum Command {
     #[command(visible_alias = "lt")]
     ListTrees,
     /// Removes the Space with the given name.
-    Remove {
+    #[command(visible_alias = "rm-s")]
+    RemoveSpace {
         /// Name of the Space to remove.
         space: String,
     },
@@ -298,7 +301,7 @@ pub fn run_command(args: Cli, ctx: &mut Context, repl: bool) -> Result {
         Some(Command::Wdir { space }) => wdir::command(ctx, space)?,
         Some(Command::ListSpaces) => list_spaces::command(ctx)?,
         Some(Command::ListTrees) => list_trees::command(ctx)?,
-        Some(Command::Remove { space }) => remove::command(ctx, space)?,
+        Some(Command::RemoveSpace { space }) => remove_space::command(ctx, space)?,
         Some(Command::Go { space }) => go::command(ctx, space)?,
         Some(Command::Edit { space, wdir, tree }) => edit::command(ctx, space, wdir, tree)?,
         Some(Command::NewTree { name }) => new_tree::command(ctx, name)?,

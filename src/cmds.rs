@@ -6,5 +6,5 @@ pub mod init;
 pub mod list_spaces;
 pub mod list_trees;
 pub mod new_tree;
-pub mod remove;
+pub mod remove_space;
 pub mod wdir;
