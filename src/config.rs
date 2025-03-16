@@ -236,6 +236,10 @@ impl Config {
     pub fn insert_tree(&mut self, tree_name: String, tree: SpaceTree) {
         self.trees.insert(SpaceTreeId(tree_name), tree);
     }
+
+    pub fn remove_tree(&mut self, tree_name: String) {
+        self.trees.remove(&SpaceTreeId(tree_name));
+    }
 }
 
 impl Default for Config {

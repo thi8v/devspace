@@ -12,9 +12,6 @@
 // param to disable it. If a new version is available, print a warn when using
 // the app.
 //
-// TODO: create a `remove-tree` command, and rename `remove` command to
-// `remove-space`
-//
 // TODO: make the shell completions with `clap_complete`
 use std::{
     env::{VarError, var},
@@ -178,6 +175,12 @@ pub enum Command {
         /// Name of the Tree to be created.
         name: String,
     },
+    /// Removes the Tree with the given name.
+    #[command(visible_alias = "rm-t")]
+    RemoveTree {
+        /// Name of the Tree to remove.
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -305,6 +308,7 @@ pub fn run_command(args: Cli, ctx: &mut Context, repl: bool) -> Result {
         Some(Command::Go { space }) => go::command(ctx, space)?,
         Some(Command::Edit { space, wdir, tree }) => edit::command(ctx, space, wdir, tree)?,
         Some(Command::NewTree { name }) => new_tree::command(ctx, name)?,
+        Some(Command::RemoveTree { name }) => remove_tree::command(ctx, name)?,
         None if !repl => {
             repl::run()?;
         }
