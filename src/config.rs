@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Debug, io::Write};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tmux_interface::{SendKeys, SplitWindow, TmuxCommands};
+use tmux_interface::{SelectPane, SendKeys, SplitWindow, TmuxCommands};
 
 use crate::{DsError, Result, database::Space};
 
@@ -45,21 +45,22 @@ impl SpaceTree {
                     .add_command(SendKeys::new().target_pane(space_name).key("C-m").into());
                 Ok(cmds)
             }
-            // TODO: fix the splits it doesn't work like it should be working.
             Self::TmuxVSplit { lhs, rhs } => {
                 let mut cmds = TmuxCommands::new();
 
-                // push the lhs first
+                // push the split first
+                cmds.push(SplitWindow::new().horizontal().target_window(space_name));
+
+                // then push the left
                 if let Some(lhs) = lhs {
+                    cmds.push(SelectPane::new().left());
                     let lhs = lhs.build(space, space_name)?;
                     cmds.push_cmds(lhs);
                 }
 
-                // push the split
-                cmds.push(SplitWindow::new().horizontal().target_window(space_name));
-
-                // finally push the rhs
+                // finally push the right
                 if let Some(rhs) = rhs {
+                    cmds.push(SelectPane::new().right());
                     let rhs = rhs.build(space, space_name)?;
                     cmds.push_cmds(rhs);
                 }
@@ -69,17 +70,19 @@ impl SpaceTree {
             Self::TmuxHSplit { top, bottom } => {
                 let mut cmds = TmuxCommands::new();
 
-                // push the top first
+                // push the split first
+                cmds.push(SplitWindow::new().vertical().target_window(space_name));
+
+                // then push the top
                 if let Some(top) = top {
+                    cmds.push(SelectPane::new().up());
                     let top = top.build(space, space_name)?;
                     cmds.push_cmds(top);
                 }
 
-                // push the split
-                cmds.push(SplitWindow::new().vertical().target_window(space_name));
-
                 // finally push the bottom
                 if let Some(bottom) = bottom {
+                    cmds.push(SelectPane::new().down());
                     let bottom = bottom.build(space, space_name)?;
                     cmds.push_cmds(bottom);
                 }
