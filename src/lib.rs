@@ -11,6 +11,9 @@
 // TODO: add a thing that checks if a new version is available and a config
 // param to disable it. If a new version is available, print a warn when using
 // the app.
+//
+// TODO: create a `remove-tree` command, and rename `remove` command to
+// `remove-space`
 use std::{
     env::{VarError, var},
     fmt::{Debug, Error as FmtError},
@@ -29,6 +32,7 @@ use tmux_interface::Error as TmuxError;
 use crate::cmds::*;
 use crate::config::{CmdParsingError, Config, SpaceTreeId};
 use crate::database::DataBase;
+use crate::new_tree::InteractiveError;
 
 shadow!(build);
 pub(crate) mod cmds;
@@ -73,6 +77,8 @@ pub enum DsError {
     InvalidREPL,
     #[error("the directory {0:?} doesn't exists.")]
     DirDoesntExists(PathBuf),
+    #[error(transparent)]
+    InteractiveError(#[from] InteractiveError),
 }
 
 #[derive(Parser, Debug)]
@@ -112,7 +118,6 @@ impl Cli {
     }
 }
 
-// TODO: add an interactive comand to create trees.
 #[derive(Parser, Debug)]
 pub enum Command {
     /// Initializes a new development space.
@@ -162,6 +167,13 @@ pub enum Command {
         /// The new tree of the Space.
         #[arg(long, short)]
         tree: Option<SpaceTreeId>,
+    },
+    /// Interactive tree creation.
+    ///
+    /// It overwrites the Tree if there is already a tree with this name.
+    NewTree {
+        /// Name of the Tree to be created.
+        name: String,
     },
 }
 
@@ -289,6 +301,7 @@ pub fn run_command(args: Cli, ctx: &mut Context, repl: bool) -> Result {
         Some(Command::Remove { space }) => remove::command(ctx, space)?,
         Some(Command::Go { space }) => go::command(ctx, space)?,
         Some(Command::Edit { space, wdir, tree }) => edit::command(ctx, space, wdir, tree)?,
+        Some(Command::NewTree { name }) => new_tree::command(ctx, name)?,
         None if !repl => {
             repl::run()?;
         }

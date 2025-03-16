@@ -6,6 +6,8 @@ use tmux_interface::{SelectPane, SendKeys, SplitWindow, TmuxCommands};
 
 use crate::{DsError, Result, database::Space};
 
+/// A tree, represents what the environment will look like.
+//  /!\ If a tree is create update the `new-tree` command.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum SpaceTree {
     /// A command to run, the format is special.
@@ -229,6 +231,10 @@ impl Config {
         self.trees
             .get(key)
             .ok_or(DsError::SpaceTreeNotFound(key.clone()))
+    }
+
+    pub fn insert_tree(&mut self, tree_name: String, tree: SpaceTree) {
+        self.trees.insert(SpaceTreeId(tree_name), tree);
     }
 }
 
