@@ -1,6 +1,11 @@
 [package]
 name = "devspace"
-version = "0.1.0-dev"
+version = "0.1.0"
+description = "devspace helps you to quickly start all the programs you need to dev using Tmux and other tools."
+repository = "https://github.com/thi8v/devspace"
+readme = "README.md"
+categories = ["command-line-utilities", "development-tools"]
+keywords = ["devspace", "tmux"]
 edition = "2024"
 license = "MIT OR Apache-2.0"
 
